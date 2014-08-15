@@ -1,0 +1,21 @@
+This python code pulls the report using Surfline's API. The URLs look like this:
+
+http://api.surfline.com/v1/forecasts/0000?resources=surf,analysis&days=6&getAllSpots=false&units=e&interpolate=false&showOptimal=false
+
+except where the 0000 is replaced by a 4 digit number. This is the ID of the spot or region. Each specific spot has both a spot ID and regional ID. The spot ID will give you todays forecast specific to that spot, where the next 5 days are for the region. 
+
+So when you createa  'surf spot' like this oceanBeach = SurfSpot("Ocean Beach", "4127", "2957") the first number is the spot ID, the second is the region ID. 
+
+The data is packed into 16 byte chunks an sent over serial using the Beans virtual serial function. 
+
+A typical chunk looks like this: [0,0,6,1,2,3,4,5,5,1,4,5,5,7,5,5]
+The data is indexed like the below:
+index0: the row of neopixels to update, the 'surf spot'. This is 0-6 on my map, since I have 7 spots total
+index1: 0 denotes that wave heights are the next piece of data to come
+index2: the days in the forecast. typically 6.
+index3-8: wave heights in feet
+index9: 1 denotes that wave conditions will come next
+index10-15: wave conditions. 0-10. possiblities are: ["","flat", "very poor", "poor","poor to fair","fair","fair to good","good","very good","good to epic","epic"]
+
+On the surf map, the arduino code sets brightness and color. Blue is poor, blue-green is poor to fair, green is fair, orange is good, red is EPIC!
+
