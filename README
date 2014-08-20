@@ -19,3 +19,4 @@ index10-15: wave conditions. 0-10. possiblities are: ["","flat", "very poor", "p
 
 On the surf map, the arduino code sets brightness and color. Blue is poor, blue-green is poor to fair, green is fair, orange is good, red is EPIC!
 
+I use Wunderground's API for the tide times. See http://api.wunderground.com
