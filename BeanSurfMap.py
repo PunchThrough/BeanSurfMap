@@ -4,23 +4,57 @@
 # http://punchthrough.com/bean
 # http://punchthrough.com/bean/examples/surf-report-notifier/
 # https://github.com/PunchThrough/BeanSurfMap
-
+import datetime
 import urllib2
 import simplejson as json
 import time
 import serial
 from decimal import *
+import config
 
 daysInReport = 6
 readingsToAverage = 4
-
+earliestSurfHour=5 #ignore tide times earlier than 5am
+latestSurfHour=21   #and later than 9pm
 conditionTypes=["","flat", "very poor", "poor","poor to fair","fair","fair to good","good","very good","good to epic","epic"]
+
+lowTides=[]
+highTides=[]
+
+tideUrl="http://api.wunderground.com/api/APIKEY/tide/settings/q/CA/94019.json"
+tideUrl=tideUrl.replace("APIKEY",config.wundergroundApiKey)
+webreq = urllib2.Request(tideUrl)
+opener = urllib2.build_opener()
+f = opener.open(webreq)
+fstr = f.read()
+fstr = fstr.strip() #remove any whitespace in start/end
+tideReport=json.loads(fstr)	
+
+for eachDay in tideReport["tide"]["tideSummary"]:
+	if int(eachDay["date"]["mday"])==datetime.datetime.now().day and int(eachDay["date"]["hour"])>earliestSurfHour and int(eachDay["date"]["hour"])<latestSurfHour: #only add tide times during the day
+		if eachDay["data"]["type"]=="Low Tide":
+			lowTides.append(eachDay)
+		elif eachDay["data"]["type"]=="High Tide":
+			highTides.append(eachDay)
+
+if len(lowTides)>0:
+
+	#print "low tides: "+str(self.lowTides)
+	print "Low Tide at: "+str(lowTides[0]["date"]["hour"])+":"+str(lowTides[0]["date"]["min"])
+if len(highTides)>0:
+	#print "Number of high tides: "+str(len(self.highTides))
+	#print "high tides: "+str(self.highTides)
+	print "High Tide at: "+str(highTides[0]["date"]["hour"])+":"+str(highTides[0]["date"]["min"])
+
+
 
 class SurfSpot:
 	baseUrl="http://api.surfline.com/v1/forecasts/0000?resources=surf,analysis&days=6&getAllSpots=false&units=e&interpolate=false&showOptimal=false"
 	heightsMax=[]
 	heightsMin=[]
+
 	surflineUrl=""
+	tideUrl=""
 	surflineRegionalUrl=""
 	surflineName=""
 	textConditions=[]
@@ -31,6 +65,7 @@ class SurfSpot:
 		self.spotName = spotName
 		self.surflineUrl=self.baseUrl.replace("0000",spotID)
 		self.surflineRegionalUrl=self.baseUrl.replace("0000",regionalID)
+
 		self.heightsMax=[]
 		self.heightsMin=[]
 		self.regionalConditions=[]
@@ -41,7 +76,7 @@ class SurfSpot:
 		fstr = f.read()
 		fstr = fstr.replace(')','') #remove closing )
 		fstr = fstr.replace(';','') #remove semicolon
-		fstr = fstr.strip() #reove any whitespace in start/end
+		fstr = fstr.strip() #remove any whitespace in start/end
 		rep = json.loads(fstr)
 
 		webreq = urllib2.Request(self.surflineRegionalUrl, None, {'user-agent':'syncstream/vimeo'})
@@ -50,8 +85,9 @@ class SurfSpot:
 		fstr = f.read()
 		fstr = fstr.replace(')','') #remove closing )
 		fstr = fstr.replace(';','') #remove semicolon
-		fstr = fstr.strip() #reove any whitespace in start/end
+		fstr = fstr.strip() #rem3ove any whitespace in start/end
 		regionalReport=json.loads(fstr)
+
 
 		self.surflineName=rep["name"]
 		for day in range(0,daysInReport):
@@ -109,11 +145,46 @@ for spot in spots:
 		ser.flush()
 	else:
 		print "Serial port not open."
-	time.sleep(.25)
+	time.sleep(.1)
 	spot.printReport()
-	print ""
 	spotindex+=1
 
-ser.close()
 
+#now send tides 
+#[0,0,6,1,2,3,4,5,5,1,4,5,5,7,5,5]
+#[4,2,length of tides(2), low tide hour, low tide min, high tide hour, high tide min, 0,0, remainder zeros ]
+
+sendBytes=[]
+sendBytes.append(4)  #starts at 4th neopixel array	
+sendBytes.append(2)  #tide iD is 2
+sendBytes.append(len(lowTides)+len(highTides))
+if (len(lowTides)>0):
+	sendBytes.append(int(lowTides[0]["date"]["hour"]))
+	sendBytes.append(int(lowTides[0]["date"]["min"]))
+else:
+	sendBytes.append(0)
+	sendBytes.append(0)
+if (len(highTides)>0):
+	sendBytes.append(int(highTides[0]["date"]["hour"]))
+	sendBytes.append(int(highTides[0]["date"]["min"]))
+else:
+	sendBytes.append(0)
+	sendBytes.append(0)
+while len(sendBytes)< 16:
+	sendBytes.append(0) #fill reaminder with zeros 
+
+buff=[chr(i) for i in sendBytes]
+ser.write(buff)
+ser.flush()
+
+# sendBytes=[0,3,1,11]
+# while len(sendBytes)< 16:
+# 	sendBytes.append(0) #fill reaminder with zeros 
+# buff=[chr(i) for i in sendBytes]
+# print buff #debug
+# ser.write(buff)
+# ser.flush()
+
+time.sleep(.25)
+ser.close()
 print "Finished."
